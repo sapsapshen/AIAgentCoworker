@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "workspace": ".",
+  "run_root": ".agent-relay/runs",
+  "planner_role": "codex-planner",
+  "worker_role": "reasonix-worker",
+  "roles": {
+    "codex-planner": {
+      "executable": "codex",
+      "argv": [
+        "exec", "--skip-git-repo-check", "--sandbox", "workspace-write",
+        "--output-schema", "{schema_file}",
+        "--output-last-message", "{output_file}",
+        "-C", "{workspace}", "{prompt}"
+      ],
+      "input": "prompt",
+      "output": "json-file",
+      "timeout_seconds": 900
+    },
+    "reasonix-worker": {
+      "executable": "reasonix",
+      "argv": ["run", "--input", "{input_file}", "--output", "{output_file}"],
+      "input": "json-file",
+      "output": "json-file",
+      "timeout_seconds": 1200
+    }
+  }
+}

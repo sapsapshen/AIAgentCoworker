@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "workspace": ".",
+  "run_root": ".agent-relay/runs",
+  "planner_role": "codex-planner",
+  "worker_role": "codewhale-worker",
+  "roles": {
+    "codex-planner": {
+      "executable": "codex",
+      "argv": [
+        "exec", "--skip-git-repo-check", "--sandbox", "read-only",
+        "--output-schema", "{schema_file}",
+        "--output-last-message", "{output_file}",
+        "-C", "{workspace}", "{prompt}"
+      ],
+      "input": "prompt",
+      "output": "json-file",
+      "timeout_seconds": 900
+    },
+    "codewhale-worker": {
+      "executable": "codewhale",
+      "argv": [
+        "exec", "--auto", "--max-turns", "50",
+        "读取 {input_file} 中的 plan 字段并逐步执行所有步骤。完成后，必须使用 write_file 工具将 result-v1 JSON 写入 {output_file}。JSON 格式要求：contract=\"result-v1\", status=\"passed\"或\"failed\"或\"blocked\", summary=非空字符串描述, evidence=字符串数组（证据文件路径）。所有交付文件必须写入 {outputs_dir} 目录。{prompt}"
+      ],
+      "input": "json-file",
+      "output": "json-file",
+      "timeout_seconds": 1200
+    }
+  }
+}

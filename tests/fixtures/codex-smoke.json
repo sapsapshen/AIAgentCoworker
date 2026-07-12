@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "workspace": "../..",
+  "run_root": "../../.agent-relay/codex-smoke-runs",
+  "planner_role": "installed-codex",
+  "worker_role": "mock-worker",
+  "roles": {
+    "installed-codex": {
+      "executable": "codex",
+      "argv": [
+        "exec", "--skip-git-repo-check", "--sandbox", "read-only",
+        "--output-schema", "{schema_file}", "--output-last-message", "{output_file}",
+        "-C", "{workspace}", "{prompt}"
+      ],
+      "input": "prompt",
+      "output": "json-file",
+      "timeout_seconds": 120
+    },
+    "mock-worker": {
+      "executable": "python",
+      "argv": ["tests/fixtures/mock_agent.py", "worker", "--input", "{input_file}", "--output", "{output_file}"],
+      "input": "json-file",
+      "output": "json-file",
+      "timeout_seconds": 10
+    }
+  }
+}

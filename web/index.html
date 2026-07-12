@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Coworker</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #f4f6f9; --panel: #ffffff; --border: #e2e8f0; --ink: #1e293b;
+    --muted: #64748b; --accent: #2563eb; --accent-d: #1d4ed8;
+    --ok: #16a34a; --err: #dc2626; --warn: #d97706;
+    --console-bg: #0f172a; --console-ink: #e2e8f0;
+  }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink); font-size: 14px;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 17px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .dot.ok { background: var(--ok); }
+  .dot.err { background: var(--err); }
+  .dot.run { background: var(--warn); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .wrap { max-width: 1100px; margin: 18px auto; padding: 0 18px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .field { flex: 1; min-width: 200px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  select, textarea, input[type=text] {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 14px; font-family: inherit; background: #fff; color: var(--ink);
+  }
+  textarea { min-height: 130px; resize: vertical; line-height: 1.5; }
+  .btns { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  button {
+    padding: 9px 18px; border: none; border-radius: 7px; font-size: 14px; cursor: pointer;
+    background: var(--accent); color: #fff; transition: background .15s;
+  }
+  button:hover { background: var(--accent-d); }
+  button:disabled { background: #cbd5e1; cursor: not-allowed; }
+  button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--border); }
+  button.ghost:hover { background: #f1f5f9; }
+  button.danger { background: #fff; color: var(--err); border: 1px solid var(--err); }
+  button.shutdown { background: #fff; color: var(--muted); border: 1px solid var(--border); }
+  .output { margin-top: 4px; }
+  .output-head {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--console-bg); color: #94a3b8; padding: 8px 14px;
+    border-radius: 8px 8px 0 0; font-size: 12px;
+  }
+  pre {
+    margin: 0; background: var(--console-bg); color: var(--console-ink); padding: 14px;
+    border-radius: 0 0 8px 8px; height: 360px; overflow: auto; white-space: pre-wrap;
+    word-break: break-word; font-family: "Cascadia Code", Consolas, monospace; font-size: 13px;
+    line-height: 1.5;
+  }
+  .runs h3 { margin: 0 0 10px; font-size: 14px; }
+  .runs ul { list-style: none; margin: 0; padding: 0; }
+  .runs li {
+    padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px; margin-bottom: 7px;
+    display: flex; align-items: center; justify-content: space-between; font-size: 13px;
+  }
+  .runs li .meta { color: var(--muted); font-size: 12px; }
+  .tag { padding: 2px 8px; border-radius: 20px; font-size: 11px; margin-left: 6px; }
+  .tag.completed { background: #dcfce7; color: var(--ok); }
+  .tag.failed { background: #fee2e2; color: var(--err); }
+  .tag.running { background: #fef3c7; color: var(--warn); }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .banner {
+    display: none; background: #fef2f2; color: var(--err); border: 1px solid #fecaca;
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤝 Agent Coworker</h1>
+  <span id="serverStatus"><span class="dot ok"></span>已连接</span>
+</header>
+
+<div class="wrap">
+  <div id="connBanner" class="banner"></div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="field">
+        <label>配置文件 (Profile)</label>
+        <select id="config"></select>
+      </div>
+      <div class="field">
+        <label>模式 (Mode)</label>
+        <select id="mode">
+          <option value="check">check — 自检 (doctor + 测试 + mock e2e)</option>
+          <option value="dry">dry — 干跑 (渲染命令，不调模型)</option>
+          <option value="real">real — 真实执行 (调用模型)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>任务描述 (Task)</label>
+      <textarea id="task" placeholder="描述你要执行的任务，例如：&#10;在当前项目中添加一个计算两个日期之间工作日数量的函数..."></textarea>
+      <div class="hint">check 模式无需任务；dry / real 模式必须填写。</div>
+    </div>
+    <div class="btns">
+      <button id="runBtn" onclick="startRun()">▶ 运行</button>
+      <button id="stopBtn" class="danger" onclick="stopRun()" disabled>■ 停止</button>
+      <button id="doctorBtn" class="ghost" onclick="runDoctor()">🔍 检查工具</button>
+      <button id="shutdownBtn" class="shutdown" onclick="shutdownServer()">⏻ 关闭服务</button>
+    </div>
+    <pre id="doctorOut" style="display:none;height:160px;margin-top:12px;border-radius:8px;"></pre>
+  </div>
+
+  <div class="panel output">
+    <div class="output-head">
+      <span>输出日志</span>
+      <span id="runStatus">空闲</span>
+    </div>
+    <pre id="log">等待运行... 若长时间无反应，请确认下方连接状态为「已连接」。</pre>
+  </div>
+
+  <div class="panel runs">
+    <h3>运行历史</h3>
+    <ul id="runList"><li class="meta">暂无运行记录</li></ul>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let activeRunId = null;
+let pollTimer = null;
+let connOk = true;
+
+function setConn(ok, msg) {
+  connOk = ok;
+  const el = $("serverStatus");
+  if (ok) {
+    el.innerHTML = '<span class="dot ok"></span>已连接';
+    $("connBanner").style.display = "none";
+  } else {
+    el.innerHTML = '<span class="dot err"></span>未连接';
+    const b = $("connBanner");
+    b.style.display = "block";
+    b.textContent = "⚠ 与本地服务失去连接：" + (msg || "服务可能已停止。请重新双击 start-agent-coworker.bat 启动。");
+  }
+}
+
+async function api(path, opts) {
+  try {
+    const r = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, opts || {}));
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } catch (e) {
+    setConn(false, e.message);
+    throw e;
+  }
+}
+
+async function loadConfigs() {
+  try {
+    const { configs } = await api("/api/configs");
+    setConn(true);
+    const sel = $("config");
+    sel.innerHTML = "";
+    (configs || []).forEach(c => {
+      const o = document.createElement("option");
+      o.value = c;
+      let label = c;
+      if (c === "relay.codewhale.json") label += " — codex 规划 + DeepSeek 执行 (推荐)";
+      else if (c === "relay.codewhale-only.json") label += " — 纯 DeepSeek (codex 不可用)";
+      o.textContent = label;
+      sel.appendChild(o);
+    });
+  } catch (e) { /* connection error already flagged */ }
+}
+
+async function runDoctor() {
+  const out = $("doctorOut");
+  out.style.display = "block";
+  out.textContent = "检查中...";
+  try {
+    const data = await api("/api/doctor", { method: "POST", body: JSON.stringify({ config: $("config").value }) });
+    out.textContent = data.output || "(无输出)";
+  } catch (e) {
+    out.textContent = "检查失败：" + e.message;
+  }
+}
+
+async function startRun() {
+  const mode = $("mode").value;
+  const task = $("task").value;
+  if ((mode === "dry" || mode === "real") && !task.trim()) {
+    alert("dry / real 模式必须填写任务描述。");
+    return;
+  }
+  try {
+    const data = await api("/api/run", {
+      method: "POST",
+      body: JSON.stringify({ config: $("config").value, task, mode }),
+    });
+    if (data.error) { alert(data.error); return; }
+    activeRunId = data.run_id;
+    $("log").textContent = "已提交任务 (run_id=" + data.run_id + ")，等待服务器返回日志...\n";
+    $("runStatus").innerHTML = '<span class="dot run"></span>运行中';
+    $("runBtn").disabled = true;
+    $("stopBtn").disabled = false;
+    startPoll();
+  } catch (e) {
+    $("log").textContent = "提交失败：" + e.message + "\n请确认服务已启动（双击 start-agent-coworker.bat）。";
+  }
+}
+
+function startPoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollRun, 800);
+}
+
+async function pollRun() {
+  if (!activeRunId) return;
+  try {
+    const run = await api("/api/runs/" + activeRunId);
+    setConn(true);
+    if (!run || run.error) return;
+    $("log").textContent = run.log || "(空)";
+    $("log").scrollTop = $("log").scrollHeight;
+    if (run.status !== "running") {
+      clearInterval(pollTimer); pollTimer = null;
+      $("runStatus").innerHTML = run.status === "completed"
+        ? '<span class="dot ok"></span>完成'
+        : '<span class="dot err"></span>失败';
+      $("runBtn").disabled = false;
+      $("stopBtn").disabled = true;
+      refreshRuns();
+    }
+  } catch (e) {
+    // connection error flagged by api(); stop polling to avoid spam
+    clearInterval(pollTimer); pollTimer = null;
+  }
+}
+
+async function stopRun() {
+  try { await api("/api/stop", { method: "POST" }); } catch (e) { /* ignore */ }
+}
+
+async function shutdownServer() {
+  if (!confirm("确定关闭本地服务？关闭后需重新双击 bat 启动。")) return;
+  try {
+    await api("/api/shutdown", { method: "POST" });
+    setConn(false, "服务已关闭。");
+    $("log").textContent = "服务已关闭，可安全关闭本浏览器标签页。";
+  } catch (e) {
+    alert("关闭失败：" + e.message);
+  }
+}
+
+async function refreshRuns() {
+  try {
+    const { runs } = await api("/api/runs");
+    setConn(true);
+    const ul = $("runList");
+    if (!runs || !runs.length) { ul.innerHTML = '<li class="meta">暂无运行记录</li>'; return; }
+    ul.innerHTML = "";
+    runs.slice(0, 12).forEach(r => {
+      const li = document.createElement("li");
+      const label = r.mode === "check" ? "自检" : r.mode === "dry" ? "干跑" : "真实";
+      li.innerHTML = `<span><b>${label}</b> <span class="meta">${r.id}</span></span>` +
+        `<span class="tag ${r.status}">${r.status}</span>`;
+      ul.appendChild(li);
+    });
+  } catch (e) { /* connection error already flagged */ }
+}
+
+window.addEventListener("error", (ev) => {
+  const box = $("log");
+  if (box) box.textContent = "[页面脚本错误] " + (ev.message || ev.error) + "\n请刷新页面后重试。";
+});
+
+(async function init() {
+  await loadConfigs();
+  await refreshRuns();
+  setInterval(refreshRuns, 5000);
+  try {
+    const health = await api("/api/health");
+    setConn(!!health);
+  } catch (e) {
+    setConn(false, e.message);
+  }
+})();
+</script>
+</body>
+</html>

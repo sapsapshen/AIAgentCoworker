@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "workspace": "../..",
+  "run_root": "../../.agent-relay/test-runs",
+  "planner_role": "any-planner",
+  "worker_role": "any-worker",
+  "roles": {
+    "any-planner": {
+      "executable": "python",
+      "argv": ["tests/fixtures/mock_agent.py", "planner", "--input", "{input_file}", "--output", "{output_file}"],
+      "input": "prompt",
+      "output": "json-file",
+      "timeout_seconds": 10
+    },
+    "any-worker": {
+      "executable": "python",
+      "argv": ["tests/fixtures/mock_agent.py", "worker", "--input", "{input_file}", "--output", "{output_file}"],
+      "input": "json-file",
+      "output": "json-file",
+      "timeout_seconds": 10
+    }
+  }
+}

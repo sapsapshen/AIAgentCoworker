@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "workspace": ".",
+  "run_root": ".agent-relay/runs",
+  "planner_role": "codewhale-planner",
+  "worker_role": "codewhale-worker",
+  "roles": {
+    "codewhale-planner": {
+      "executable": "codewhale",
+      "argv": [
+        "exec", "--auto", "--max-turns", "10",
+        "你是规划者。阅读任务后，使用 write_file 工具将 plan-v1 JSON 写入 {output_file}。JSON 格式：contract=\"plan-v1\", goal=非空字符串（目标）, steps=非空字符串数组（可执行步骤）, acceptance=非空字符串数组（验收标准）。不要修改代码，不要添加 Markdown。{prompt}"
+      ],
+      "input": "prompt",
+      "output": "json-file",
+      "timeout_seconds": 300
+    },
+    "codewhale-worker": {
+      "executable": "codewhale",
+      "argv": [
+        "exec", "--auto", "--max-turns", "50",
+        "读取 {input_file} 中的 plan 字段并逐步执行所有步骤。完成后，必须使用 write_file 工具将 result-v1 JSON 写入 {output_file}。JSON 格式要求：contract=\"result-v1\", status=\"passed\"或\"failed\"或\"blocked\", summary=非空字符串描述, evidence=字符串数组（证据文件路径）。所有交付文件必须写入 {outputs_dir} 目录。{prompt}"
+      ],
+      "input": "json-file",
+      "output": "json-file",
+      "timeout_seconds": 1200
+    }
+  }
+}

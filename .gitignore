@@ -1,0 +1,22 @@
+# Generated artifacts
+.agent-relay/
+outputs/
+__pycache__/
+*.py[cod]
+*.class
+
+# Local/private configs
+.env
+relay.local.json
+*.local.json
+
+# Workspace memory (personal)
+.workbuddy/
+
+# Windows / macOS junk
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Optional: web server pid marker (if created)
+web-server.pid
