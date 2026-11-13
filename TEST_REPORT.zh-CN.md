@@ -1,5 +1,7 @@
 # 创建时测试报告（2026-07-12）
 
+> 这是项目创建当天的环境快照，不是当前机器或 CI 的结论。现行检查在 GitHub Actions（`.github/workflows/ci.yml`）里跑标准库单元测试和 mock 端到端，不依赖本机是否安装 Codex 或 Reasonix。下文里的 `codex-cli 0.142.0` 与 `gpt-5.6-terra` 只说明当时那次 smoke test 失败的原因。
+
 ## 环境探测
 
 | 角色候选 | 探测结果 | 可执行性 |

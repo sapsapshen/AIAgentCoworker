@@ -73,6 +73,8 @@
   .tag.completed { background: #dcfce7; color: var(--ok); }
   .tag.failed { background: #fee2e2; color: var(--err); }
   .tag.running { background: #fef3c7; color: var(--warn); }
+  .tag.stopped { background: #e2e8f0; color: var(--muted); }
+  .dot.idle { background: var(--muted); }
   .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
   .banner {
     display: none; background: #fef2f2; color: var(--err); border: 1px solid #fecaca;
@@ -148,19 +150,27 @@ function setConn(ok, msg) {
     el.innerHTML = '<span class="dot err"></span>未连接';
     const b = $("connBanner");
     b.style.display = "block";
-    b.textContent = "⚠ 与本地服务失去连接：" + (msg || "服务可能已停止。请重新双击 start-agent-coworker.bat 启动。");
+    b.textContent = "⚠ 与本地服务失去连接：" + (msg || "服务可能已停止。请重新运行 start-agent-coworker.bat 或 ./start-web.sh。");
   }
 }
 
 async function api(path, opts) {
+  let response;
   try {
-    const r = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, opts || {}));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return await r.json();
+    response = await fetch(path, Object.assign({ headers: { "Content-Type": "application/json" } }, opts || {}));
   } catch (e) {
     setConn(false, e.message);
     throw e;
   }
+  let data = {};
+  try { data = await response.json(); } catch (e) { data = {}; }
+  if (!response.ok) {
+    const error = new Error((data && data.error) || ("HTTP " + response.status));
+    error.status = response.status;
+    throw error;
+  }
+  setConn(true);
+  return data;
 }
 
 async function loadConfigs() {
@@ -213,7 +223,8 @@ async function startRun() {
     $("stopBtn").disabled = false;
     startPoll();
   } catch (e) {
-    $("log").textContent = "提交失败：" + e.message + "\n请确认服务已启动（双击 start-agent-coworker.bat）。";
+    const hint = e.status ? "" : "\n请确认服务已启动（双击 start-agent-coworker.bat，或运行 ./start-web.sh）。";
+    $("log").textContent = "提交失败：" + e.message + hint;
   }
 }
 
@@ -232,16 +243,20 @@ async function pollRun() {
     $("log").scrollTop = $("log").scrollHeight;
     if (run.status !== "running") {
       clearInterval(pollTimer); pollTimer = null;
-      $("runStatus").innerHTML = run.status === "completed"
-        ? '<span class="dot ok"></span>完成'
-        : '<span class="dot err"></span>失败';
+      const markup = {
+        completed: '<span class="dot ok"></span>完成',
+        failed: '<span class="dot err"></span>失败',
+        stopped: '<span class="dot idle"></span>已停止',
+      };
+      $("runStatus").innerHTML = markup[run.status] || '<span class="dot idle"></span>结束';
       $("runBtn").disabled = false;
       $("stopBtn").disabled = true;
       refreshRuns();
     }
   } catch (e) {
-    // connection error flagged by api(); stop polling to avoid spam
-    clearInterval(pollTimer); pollTimer = null;
+    if (!e.status) {
+      clearInterval(pollTimer); pollTimer = null;
+    }
   }
 }
 
@@ -267,11 +282,21 @@ async function refreshRuns() {
     const ul = $("runList");
     if (!runs || !runs.length) { ul.innerHTML = '<li class="meta">暂无运行记录</li>'; return; }
     ul.innerHTML = "";
+    const labels = { check: "自检", dry: "干跑", real: "真实" };
     runs.slice(0, 12).forEach(r => {
       const li = document.createElement("li");
-      const label = r.mode === "check" ? "自检" : r.mode === "dry" ? "干跑" : "真实";
-      li.innerHTML = `<span><b>${label}</b> <span class="meta">${r.id}</span></span>` +
-        `<span class="tag ${r.status}">${r.status}</span>`;
+      const left = document.createElement("span");
+      const title = document.createElement("b");
+      title.textContent = labels[r.mode] || r.mode || "";
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      meta.textContent = " " + (r.id || "");
+      left.append(title, meta);
+      const tag = document.createElement("span");
+      const status = typeof r.status === "string" && /^[a-z]+$/.test(r.status) ? r.status : "failed";
+      tag.className = "tag " + status;
+      tag.textContent = r.status || "";
+      li.append(left, tag);
       ul.appendChild(li);
     });
   } catch (e) { /* connection error already flagged */ }
@@ -289,6 +314,7 @@ window.addEventListener("error", (ev) => {
   try {
     const health = await api("/api/health");
     setConn(!!health);
+    if (health && health.version) $("serverStatus").title = "handoff-relay " + health.version;
   } catch (e) {
     setConn(false, e.message);
   }

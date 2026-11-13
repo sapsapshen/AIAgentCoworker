@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "handoff-relay"
+dynamic = ["version"]
+description = "Local, auditable planner/worker handoff orchestrator for coding agents."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "shenmian" }]
+keywords = ["agents", "orchestration", "handoff"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/sapsapshen/AIAgentCoworker"
+Repository = "https://github.com/sapsapshen/AIAgentCoworker"
+
+[project.scripts]
+handoff-relay = "handoff_relay.__main__:main"
+
+[tool.setuptools]
+packages = ["handoff_relay"]
+
+[tool.setuptools.dynamic]
+version = { attr = "handoff_relay.__version__" }

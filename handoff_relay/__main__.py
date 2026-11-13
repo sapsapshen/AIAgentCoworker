@@ -4,12 +4,14 @@ import argparse
 import json
 import sys
 
+from . import __version__
 from .config import load_config
 from .runtime import RelayError, doctor, run_task
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(prog="handoff-relay")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="handoff-relay", description="本地可审计的指挥者/执行者编排器")
+    parser.add_argument("--version", action="version", version=f"handoff-relay {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("doctor", "run"):
         command = sub.add_parser(name)
@@ -17,7 +19,7 @@ def main() -> int:
         if name == "run":
             command.add_argument("--task-file", required=True)
             command.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         config = load_config(args.config)
         if args.command == "doctor":

@@ -20,3 +20,11 @@ desktop.ini
 
 # Optional: web server pid marker (if created)
 web-server.pid
+
+# Packaging / local envs
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
