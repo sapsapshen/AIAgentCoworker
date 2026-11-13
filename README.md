@@ -40,9 +40,9 @@ AI Agent Coworker（代号 `Agent Relay`）把 AI 编程任务拆成两层：
 
 ### 环境要求
 
-- Python 3.11+
+- Python 3.11+。命令名可以是 `python` 或 `python3`。配置里如果写了 `python` / `python3`，而这个名字不在 PATH 里，Relay 会改用当前正在运行的解释器。其他命令不会被悄悄替换。
 - 可选 CLI：`codex`（OpenAI） / `codewhale`（DeepSeek，安装后桌面端通常自带）
-- 无第三方运行时依赖，纯标准库实现
+- 无第三方运行时依赖，纯标准库实现。`pip install -e .` 只会多一个 `handoff-relay` 命令，不引入运行时依赖。
 
 ### 1. 自检
 
@@ -58,6 +58,15 @@ python -m unittest discover -s tests -v
 # 双击 start-agent-coworker.bat
 # 浏览器会自动打开 http://127.0.0.1:8000
 # 在页面选择配置、模式、填写任务后点击「运行」
+```
+
+macOS / Linux：
+
+```bash
+./start-web.sh
+# 浏览器打开 http://127.0.0.1:8000
+# AGENT_COWORKER_NO_BROWSER=1 ./start-web.sh   # 只启动服务
+# AGENT_COWORKER_PORT=8765 ./start-web.sh       # 换端口，被占用时会向后尝试
 ```
 
 ### 3. 命令行方式运行
@@ -110,8 +119,10 @@ python -m handoff_relay run --config relay.codewhale.json --task-file task.md
 
 1. `created`：编排器创建本次运行目录（`outputs/<run-id>/` 与 `.agent-relay/runs/<run-id>/`）。
 2. `planned`：Planner 输出 `plan-v1`（goal、steps、acceptance）。
-3. `working`：Worker 读取计划并执行，输出 `result-v1`（status、summary、evidence）。
-4. `completed` / `failed`：根据 result 状态结束运行。
+3. `invoking`：Worker 读取计划并执行，输出 `result-v1`（status、summary、evidence）。
+4. `completed` / `failed`：根据 result 状态结束运行。worker 返回合法的 `failed` / `blocked` 时，运行记为失败，但不会再换一个角色偷偷重做。
+
+`plan-v1` / `result-v1` 按仓库里的 JSON Schema 校验：未知字段会被拒绝，`steps`、`acceptance` 和 `evidence` 都必须是非空字符串列表。规划者在子进程里失败、或写出无法解析的 JSON 时，同样会留下 `events.jsonl` 和 `manifest.json`。
 
 每次运行都会留下：
 
@@ -159,26 +170,34 @@ AIAgentCoworker/
 ├── tests/                  # 单元测试与 mock 夹具
 ├── web/                    # Web UI 静态页面
 ├── web_server.py           # 本地 Web 服务（HTTP + API）
+├── pyproject.toml             # 包元数据；运行本身不需要先安装
 ├── start-agent-coworker.bat   # 一键启动脚本（Windows）
 ├── start-agent-coworker.ps1   # 控制台模式
-├── start-web.ps1              # Web 服务模式
+├── start-web.ps1              # Web 服务模式（Windows）
+├── start-web.sh               # Web 服务模式（macOS / Linux）
 ├── relay.codewhale.json       # 推荐配置
 ├── relay.codewhale-only.json  # 备选配置
 ├── relay.example.json         # 示例配置
-├── pics/                        # README 用图片
-├── outputs/                     # 任务交付物（按运行隔离）
-├── .agent-relay/                # 运行审计日志（自动生成，gitignored）
-└── .workbuddy/                  # 本地工作记忆（私密，gitignored）
+├── pics/                      # README 用图片
+├── outputs/                   # 任务交付物（按运行隔离）
+├── .agent-relay/              # 运行审计日志（自动生成，gitignored）
+├── .github/workflows/ci.yml   # Python 3.11–3.14 单元测试
+└── .workbuddy/                # 本地工作记忆（私密，gitignored）
 ```
 
 ---
 
 ## 测试
 
-```powershell
-python -m unittest discover -s tests -v
-python -m handoff_relay run --config tests/fixtures/mock-relay.json --task-file tests/fixtures/task.md
+在仓库根目录执行：
+
+```bash
+python3 -m handoff_relay --version
+python3 -m unittest discover -s tests -v
+python3 -m handoff_relay run --config tests/fixtures/mock-relay.json --task-file tests/fixtures/task.md
 ```
+
+GitHub Actions 会在 Python 3.11、3.12、3.13 和 3.14 上跑同一套测试。测试不要求本机安装 Codex、CodeWhale 或 Reasonix。
 
 ---
 
@@ -187,6 +206,8 @@ python -m handoff_relay run --config tests/fixtures/mock-relay.json --task-file 
 - 不将 API 密钥保存在配置文件或任务文件中。
 - 任务交付物写入 `outputs/<run-id>/`，运行审计日志写入 `.agent-relay/runs/<run-id>/`。
 - 本地 Web 服务只监听 `127.0.0.1`，不对外暴露。
+- Web 的 POST 只接受 `Content-Type: application/json`，并拒绝浏览器标记为跨站的请求。配置路径必须是仓库内的 JSON 文件。
+- 同一时间只跑一个任务；页面上的「停止」会结束当前子进程（POSIX 上连同它的进程组）。
 - 私密文件（`.workbuddy/`、`.agent-relay/`、`outputs/`、本地配置等）已排除在 Git 之外。
 
 ---

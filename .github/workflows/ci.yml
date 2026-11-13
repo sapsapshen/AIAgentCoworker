@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Byte-compile
+        run: python -m compileall -q handoff_relay tests web_server.py
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Mock CLI smoke
+        run: python -m handoff_relay run --config tests/fixtures/mock-relay.json --task-file tests/fixtures/task.md
+      - name: Doctor does not crash when a role is missing
+        run: |
+          set +e
+          python -m handoff_relay doctor --config relay.example.json
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then
+            echo "unexpected doctor exit $code"
+            exit "$code"
+          fi
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Editable install exposes the console script
+        run: |
+          python -m pip install -e .
+          handoff-relay --version

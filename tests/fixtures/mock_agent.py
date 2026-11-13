@@ -7,7 +7,7 @@ from pathlib import Path
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("role", choices=("planner", "worker", "bad-worker"))
+    parser.add_argument("role", choices=("planner", "worker", "bad-worker", "failed-worker"))
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
@@ -25,6 +25,13 @@ def main() -> int:
         evidence = output_path.parent / "worker-proof.txt"
         evidence.write_text("mock worker completed\n", encoding="utf-8")
         data = {"contract": "result-v1", "status": "passed", "summary": "mock worker 完成任务", "evidence": [str(evidence)]}
+    elif args.role == "failed-worker":
+        data = {
+            "contract": "result-v1",
+            "status": "failed",
+            "summary": "mock worker 未能完成任务",
+            "evidence": ["mock:failed"],
+        }
     else:
         data = {"contract": "result-v1", "status": "passed", "summary": "缺少证据", "evidence": []}
     output_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
